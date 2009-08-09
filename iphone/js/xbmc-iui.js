@@ -25,8 +25,10 @@
 function executeXbmcCommand(pageId)
 {
 	var pageName = decodeURIComponent(pageId.substr(6));
+	console.log("pagename="+pageName);
 	
 	var args = pageName.split(";");
+	console.log("args="+args);
 	switch(args[0]) {
 		case "list": 			xbmcListing(args, pageName); break;
 		case "playlist": 		xbmcPlaylist(args); break;
@@ -164,7 +166,13 @@ function xbmcRemoveFromPlaylist(args) {
 }
 
 function xbmcListing(args, pageName) {
-	var command = (args.length==3)?"GetMediaLocation("+args[1]+";"+args[2]+";)":"GetShares("+args[1]+";appendone)"
+	var realarg = args[1]
+	var karaoke = false;
+	if(args[1] == "Karaoke") {
+		karaoke = true;
+		realarg = "Music"
+	}
+	var command = (args.length==3)?"GetMediaLocation("+realarg+";"+args[2]+";)":"GetShares("+args[1]+";appendone)"
 	
 	xbmcHttpSimple(command, function(req) {
 		var newPage = document.createElement("ul");
@@ -185,7 +193,7 @@ function xbmcListing(args, pageName) {
 					classes += "addSet ";
 					
 					var addLink = document.createElement("a");
-					addLink.setAttribute("href", "#xbmc-add;" + args[1] + ";" + fields[1]); // AddToPlayList(media;[playlist];[mask])
+					addLink.setAttribute("href", "#xbmc-add;" + realarg + ";" + fields[1]); // AddToPlayList(media;[playlist];[mask])
 					addLink.appendChild(document.createTextNode(""));
 					listItem.appendChild(addLink);
 				//}
@@ -193,8 +201,14 @@ function xbmcListing(args, pageName) {
 				if (fields[2] == "1") {
 					pageLink.setAttribute("href", "#xbmc-list;" + args[1] + ";" + fields[1]);
 				} else {
-					pageLink.setAttribute("href", "#xbmc-play;" + fields[1]);
-					classes += " playButton";
+					if(karaoke)
+					{
+						pageLink.setAttribute("href","#xbmc-add;"+realarg+";"+fields[1]);
+					}
+					else {
+						pageLink.setAttribute("href", "#xbmc-play;" + fields[1]);
+						classes += " playButton";
+					}
 				}	
 				listItem.setAttribute("class", classes);
 
