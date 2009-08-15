@@ -49,9 +49,14 @@ body > ul > li.removeSet > a {
 	padding-left: 40px;
 }
 
+body > ul > li.removeSet > span.nohref {
+	padding-left: 40px;
+}
 body > ul > li.playButton > a {
 	padding-right: 30px;
 }
+
+
 body > ul > li.playButton {
 	background: url(../images/QTPlayButton.png) no-repeat right center;
 }

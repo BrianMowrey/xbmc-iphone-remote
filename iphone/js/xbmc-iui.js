@@ -25,10 +25,31 @@
 function executeXbmcCommand(pageId)
 {
 	var pageName = decodeURIComponent(pageId.substr(6));
-	console.log("pagename="+pageName);
+	
 	
 	var args = pageName.split(";");
-	console.log("args="+args);
+	
+	/* Karaoke hack, I want to just see the music playlist in the toolbar if we are in the karaoke list section
+	  if we are in the karaoke playlist don't show now playing (causes other bugs and I don't think it's needed)
+	*/
+	console.log("args1="+args[1]+", args0="+args[0]);
+	if(args[2])
+	{
+		console.log("args2="+args[2]);
+	}
+	if(args[1] == 'Karaoke' || (args[2] && args[2] == "Karaoke")) //let's standardize, I mean really
+	{
+		//some weird javascript selections cause this to mess up on the back button so I'll just leave playlist always on if it's karaoke
+		
+		$('toolbar_playlist').style.display = '';
+		$('toolbar_now_playing').style.display = 'none';
+	}
+	else
+	{
+		$('toolbar_playlist').style.display = 'none';
+		$('toolbar_now_playing').style.display = '';
+	}
+	
 	switch(args[0]) {
 		case "list": 			xbmcListing(args, pageName); break;
 		case "playlist": 		xbmcPlaylist(args); break;
@@ -71,6 +92,7 @@ function xbmcRunScript(args) { xbmcHttpSimple("ExecBuiltIn(RunScript("+args[1]+"
 
 function xbmcClearPlaylist(args) {
 	switch(args[1]) {
+		case "Karaoke":
 		case "Music": 		command = "ClearPlayList(0)"; break;
 		case "Video":		command = "ClearPlayList(1)"; break;
 		case "Slideshow":  	command = "ClearSlideshow"; break;
@@ -95,7 +117,10 @@ function xbmcPlay(args) {
 
 function xbmcPlaylistPlay(args) {
 	var command1, command2;
+	var karaoke = false;
 	switch (args[1]) {
+		case "Karaoke":
+			karaoke = true;
 		case "Music":
 			command1 = "SetCurrentPlaylist(0)";
 			command2 = "SetPlaylistSong("+((args.length>2)?args[2]:0)+")";
@@ -120,10 +145,10 @@ function xbmcPlaylistPlay(args) {
 				xbmcHttpSimple(command2, function(req2) {
 					if (req2.responseText.substring(0, 2) != "OK")
 						alert("***DEBUG***: " + req2.responseText);
-					else
+					else if(!karaoke)
 						xbmcNowPlaying();
 				});
-			} else
+			} else if (!karaoke)
 				xbmcNowPlaying();
 		}
 	});
@@ -132,6 +157,7 @@ function xbmcPlaylistPlay(args) {
 function xbmcAddToPlaylist(args) {
 	var command;
 	switch (args[1]) {
+		case "Karaoke":  
 		case "Music":    command = "AddToPlayList(" +args[2]+";0)"; break;
 		case "Video":    command = "AddToPlayList(" +args[2]+";1)"; break;
 		case "Pictures": command = "AddToSlideshow("+args[2]+")"; break;
@@ -148,6 +174,7 @@ function xbmcAddToPlaylist(args) {
 function xbmcRemoveFromPlaylist(args) {
 	var command;
 	switch (args[2]) {
+		case "Karaoke":
 		case "Music":    command = "RemoveFromPlaylist("+args[1]+";0)"; break;
 		case "Video":    command = "RemoveFromPlaylist("+args[1]+";1)"; break;
 		default: alert("***DEBUG*** [can't do that]"); return;
@@ -170,7 +197,7 @@ function xbmcListing(args, pageName) {
 	var karaoke = false;
 	if(args[1] == "Karaoke") {
 		karaoke = true;
-		realarg = "Music"
+		realarg = "Music";
 	}
 	var command = (args.length==3)?"GetMediaLocation("+realarg+";"+args[2]+";)":"GetShares("+args[1]+";appendone)"
 	
@@ -190,12 +217,14 @@ function xbmcListing(args, pageName) {
 				var classes = "";
 				
 				//if (fields[1].search(/multipath:\/\//i) < 0 && fields[1].search(/shout:\/\//i) < 0) {
+				if(!karaoke || fields[2] != 1) {		//can't add entire directories in karaoke mode
 					classes += "addSet ";
 					
 					var addLink = document.createElement("a");
-					addLink.setAttribute("href", "#xbmc-add;" + realarg + ";" + fields[1]); // AddToPlayList(media;[playlist];[mask])
+					addLink.setAttribute("href", "#xbmc-add;" + args[1] + ";" + fields[1]); // AddToPlayList(media;[playlist];[mask])
 					addLink.appendChild(document.createTextNode(""));
 					listItem.appendChild(addLink);
+				}
 				//}
 				
 				if (fields[2] == "1") {
@@ -203,7 +232,7 @@ function xbmcListing(args, pageName) {
 				} else {
 					if(karaoke)
 					{
-						pageLink.setAttribute("href","#xbmc-add;"+realarg+";"+fields[1]);
+						pageLink.setAttribute("href","#xbmc-add;"+args[1]+";"+fields[1]);
 					}
 					else {
 						pageLink.setAttribute("href", "#xbmc-play;" + fields[1]);
@@ -212,7 +241,7 @@ function xbmcListing(args, pageName) {
 				}	
 				listItem.setAttribute("class", classes);
 
-				pageLink.appendChild(document.createTextNode(fields[0]));
+				pageLink.appendChild(document.createTextNode(fields[0].replace('.mp3','')));
 				
 				listItem.appendChild(pageLink);
 				
@@ -225,7 +254,9 @@ function xbmcListing(args, pageName) {
 
 function xbmcPlaylist(args) {
 	var command;
+	var karaoke = false;
 	switch (args[1]) {
+		case "Karaoke":	  karaoke = true;
 		case "Music":     command = "GetPlaylistContents(0)"; break;
 		case "Video":     command = "GetPlaylistContents(1)"; break;
 		case "Slideshow": command = "GetSlideshowContents"; break;
@@ -235,6 +266,7 @@ function xbmcPlaylist(args) {
 		var is_new = false;
 		var id = args[1] + "_Playlist";
 		var playlist = $(id);
+		console.log("karaoke="+karaoke);
 		if (!playlist) {
 			is_new = true;
 			playlist = document.createElement("ul");
@@ -274,18 +306,45 @@ function xbmcPlaylist(args) {
 		var lines = req.responseText.split("\n");
 		if (lines[0] != "[Empty]") {
 			for (var i = 1; i < lines.length; i++) {
+				console.log("linesi="+lines[i]);
 				listItem = document.createElement("li");
-				listItem.setAttribute("class", "removeSet playButton");
+				listItem.setAttribute("class", "removeSet"+(karaoke ? '' : ' playButton'));
 				listItem.setAttribute("id", lines[i]+";"+args[1]);
 				
 				var addLink = document.createElement("a");
+				console.log("remove: "+lines[i]+ ":" +args[1]);
 				addLink.setAttribute("href", "#xbmc-remove;"+lines[i]+";"+args[1]); // RemoveFromPlaylist(filename;[playlist])
 				addLink.appendChild(document.createTextNode(""));
 				
-				var pageLink = document.createElement("a");
+				var pageLink;
 				var playId = (args[1]=="Slideshow")?lines[i]:(i-1);
-				pageLink.setAttribute("href", "#xbmc-playlistplay;"+args[1]+";"+playId);
-				pageLink.appendChild(document.createTextNode(lines[i]));
+				if(karaoke)
+				{
+					
+					//regex to get artist/title, has to be a specific directory structure
+					pageLink = document.createElement("span");
+					pageLink.setAttribute("class","nohref");
+					var re = new RegExp(/.*\\(.*?)\\(.*?)\.mp3$/);
+					var m = re.exec(lines[i]);
+					if(m == null)	//not normal directory structure, just display file path
+					{
+						pageLink.appendChild(document.createTextNode(lines[i]));	
+					}
+					else
+					{
+						//m1 = artist
+						//m2 = song if it's organized correctly
+						pageLink.appendChild(document.createTextNode(m[1]+' - '+m[2]));
+						
+					}
+				}
+				else
+				{
+					console.log("adding play link");
+					pageLink = document.createElement("a");
+					pageLink.setAttribute("href", "#xbmc-playlistplay;"+args[1]+";"+playId);
+				}
+				
 				
 				listItem.appendChild(addLink);
 				listItem.appendChild(pageLink);
